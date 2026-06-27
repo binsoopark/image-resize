@@ -1,0 +1,6 @@
+.DS_Store
+macos/build/
+macos/DerivedData/
+macos/*.xcworkspace/xcuserdata/
+macos/*.xcodeproj/xcuserdata/
+macos/*.xcodeproj/project.xcworkspace/xcuserdata/

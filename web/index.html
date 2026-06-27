@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Resize</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <h1>Image Resize</h1>
+        <p class="subtitle">
+          여러 이미지를 드래그하거나 선택한 뒤, 원하는 크기로 중심 기준 크롭합니다.
+          이미지가 목표보다 작으면 먼저 확대한 다음 크롭합니다.
+        </p>
+      </header>
+
+      <section class="controls">
+        <div class="size-inputs">
+          <label>
+            <span>너비 (px)</span>
+            <input type="number" id="targetWidth" min="1" value="800" />
+          </label>
+          <label>
+            <span>높이 (px)</span>
+            <input type="number" id="targetHeight" min="1" value="600" />
+          </label>
+          <label class="format-select">
+            <span>출력 형식</span>
+            <select id="outputFormat">
+              <option value="image/png">PNG</option>
+              <option value="image/jpeg">JPEG</option>
+              <option value="image/webp">WebP</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="processBtn" class="btn primary" disabled>
+            크롭 실행
+          </button>
+          <button type="button" id="downloadAllBtn" class="btn" disabled>
+            전체 다운로드
+          </button>
+          <button type="button" id="clearBtn" class="btn ghost" disabled>
+            초기화
+          </button>
+        </div>
+      </section>
+
+      <div
+        id="dropZone"
+        class="drop-zone"
+        tabindex="0"
+        role="button"
+        aria-label="이미지 파일을 드래그하거나 클릭하여 선택"
+      >
+        <input type="file" id="fileInput" accept="image/*" multiple hidden />
+        <div class="drop-zone-inner">
+          <svg class="drop-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" fill="currentColor" />
+          </svg>
+          <p class="drop-title">이미지를 여기에 드래그하세요</p>
+          <p class="drop-hint">또는 클릭해서 여러 파일 선택 · PNG, JPEG, WebP, GIF 등</p>
+        </div>
+      </div>
+
+      <section id="gallery" class="gallery" hidden>
+        <h2>미리보기 <span id="fileCount" class="badge">0</span></h2>
+        <div id="imageList" class="image-list"></div>
+      </section>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
