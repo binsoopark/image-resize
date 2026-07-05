@@ -151,9 +151,15 @@ enum ImageProcessor {
         }
     }
 
-    static func outputFileName(for sourceURL: URL, format: OutputFormat, suffix: String = "cropped") -> String {
+    static func outputFileName(
+        for sourceURL: URL,
+        format: OutputFormat,
+        suffix: String = "cropped",
+        width: Int,
+        height: Int
+    ) -> String {
         let base = sourceURL.deletingPathExtension().lastPathComponent
-        return "\(base)_\(suffix).\(format.fileExtension)"
+        return "\(base)_\(suffix)_\(width)x\(height).\(format.fileExtension)"
     }
 }
 

@@ -99,6 +99,8 @@ final class ImageResizeViewModel: ObservableObject {
             for index in items.indices {
                 items[index].status = .processing
                 items[index].outputSuffix = nil
+                items[index].outputWidth = nil
+                items[index].outputHeight = nil
                 if let oldURL = items[index].processedURL {
                     try? FileManager.default.removeItem(at: oldURL)
                     items[index].processedURL = nil
@@ -128,7 +130,9 @@ final class ImageResizeViewModel: ObservableObject {
                     let fileName = ImageProcessor.outputFileName(
                         for: items[index].sourceURL,
                         format: format,
-                        suffix: suffix
+                        suffix: suffix,
+                        width: width,
+                        height: height
                     )
                     let destination = tempDir.appendingPathComponent(fileName)
                     try ImageProcessor.write(cgImage: processed, to: destination, format: format)
@@ -136,6 +140,8 @@ final class ImageResizeViewModel: ObservableObject {
                     items[index].processedURL = destination
                     items[index].previewImage = NSImage(contentsOf: destination)
                     items[index].outputSuffix = suffix
+                    items[index].outputWidth = width
+                    items[index].outputHeight = height
                     items[index].status = .done
                 } catch {
                     items[index].status = .error(error.localizedDescription)

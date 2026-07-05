@@ -1,4 +1,4 @@
-/** @typedef {{ id: string, file: File, objectUrl: string, originalWidth: number, originalHeight: number, resultBlob: Blob | null, resultUrl: string | null, outputSuffix: string | null, status: 'ready' | 'processing' | 'done' | 'error', error: string | null }} ImageItem */
+/** @typedef {{ id: string, file: File, objectUrl: string, originalWidth: number, originalHeight: number, resultBlob: Blob | null, resultUrl: string | null, outputSuffix: string | null, outputWidth: number | null, outputHeight: number | null, status: 'ready' | 'processing' | 'done' | 'error', error: string | null }} ImageItem */
 
 const dropZone = document.getElementById("dropZone");
 const fileInput = document.getElementById("fileInput");
@@ -58,9 +58,10 @@ function getExtension(mime) {
   return "png";
 }
 
-function outputFileName(originalName, mime, suffix = "cropped") {
+function outputFileName(originalName, mime, suffix = "cropped", width, height) {
   const base = originalName.replace(/\.[^.]+$/, "");
-  return `${base}_${suffix}.${getExtension(mime)}`;
+  const sizePart = width && height ? `_${width}x${height}` : "";
+  return `${base}_${suffix}${sizePart}.${getExtension(mime)}`;
 }
 
 function centerCropImage(img, targetW, targetH, mime, quality = 0.92) {
@@ -214,6 +215,8 @@ async function addFiles(fileList) {
         resultBlob: null,
         resultUrl: null,
         outputSuffix: null,
+        outputWidth: null,
+        outputHeight: null,
         status: "ready",
         error: null,
       });
@@ -256,6 +259,8 @@ async function processImages(mode) {
     item.status = "processing";
     item.error = null;
     item.outputSuffix = null;
+    item.outputWidth = null;
+    item.outputHeight = null;
     if (item.resultUrl) {
       URL.revokeObjectURL(item.resultUrl);
       item.resultUrl = null;
@@ -269,6 +274,8 @@ async function processImages(mode) {
       item.resultBlob = blob;
       item.resultUrl = URL.createObjectURL(blob);
       item.outputSuffix = suffix;
+      item.outputWidth = target.w;
+      item.outputHeight = target.h;
       item.status = "done";
     } catch (err) {
       item.status = "error";
@@ -300,12 +307,19 @@ function triggerDownload(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
+function itemOutputFileName(item, mime) {
+  return outputFileName(
+    item.file.name,
+    mime,
+    item.outputSuffix ?? "cropped",
+    item.outputWidth ?? undefined,
+    item.outputHeight ?? undefined,
+  );
+}
+
 function downloadSingle(item) {
   if (!item.resultBlob) return;
-  triggerDownload(
-    item.resultBlob,
-    outputFileName(item.file.name, outputFormatSelect.value, item.outputSuffix ?? "cropped"),
-  );
+  triggerDownload(item.resultBlob, itemOutputFileName(item, outputFormatSelect.value));
 }
 
 async function downloadAllWithDirectoryPicker(doneItems, mime) {
@@ -324,7 +338,7 @@ async function downloadAllWithDirectoryPicker(doneItems, mime) {
 
   for (const item of doneItems) {
     if (!item.resultBlob) continue;
-    const name = outputFileName(item.file.name, mime, item.outputSuffix ?? "cropped");
+    const name = itemOutputFileName(item, mime);
     const fileHandle = await dirHandle.getFileHandle(name, { create: true });
     const writable = await fileHandle.createWritable();
     await writable.write(item.resultBlob);
@@ -348,7 +362,7 @@ async function downloadAllAsZip(doneItems, mime) {
   const zip = new JSZip();
   for (const item of doneItems) {
     if (!item.resultBlob) continue;
-    zip.file(outputFileName(item.file.name, mime, item.outputSuffix ?? "cropped"), item.resultBlob);
+    zip.file(itemOutputFileName(item, mime), item.resultBlob);
   }
 
   const zipBlob = await zip.generateAsync({ type: "blob" });

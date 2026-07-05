@@ -77,6 +77,8 @@ struct ImageResizeItem: Identifiable {
     var processedURL: URL?
     var previewImage: NSImage?
     var outputSuffix: String?
+    var outputWidth: Int?
+    var outputHeight: Int?
 
     init(sourceURL: URL, originalWidth: Int, originalHeight: Int, previewImage: NSImage?) {
         self.sourceURL = sourceURL
