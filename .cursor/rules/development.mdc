@@ -1,0 +1,50 @@
+---
+description: image-resize 프로젝트 개발 지침
+alwaysApply: true
+---
+
+# image-resize 개발 지침
+
+## 커밋 메시지
+
+- **한국어**로 작성한다.
+- 무엇을 바꿨는지보다 **왜** 바꿨는지를 중심으로 1~2문장으로 작성한다.
+- 형식 예: `fix: macOS 이미지 반전 문제 수정`, `feat: 비율 무시 stretch 리사이즈 추가`
+
+## 모듈 구조
+
+- `web/` — 브라우저용 정적 웹 앱 (HTML/CSS/Vanilla JS)
+- `macos/` — SwiftUI macOS 네이티브 앱
+
+웹과 macOS는 **동일한 이미지 처리 규칙**을 유지한다. 한쪽만 수정할 때는 다른 쪽도 함께 확인한다.
+
+## 이미지 처리 파이프라인
+
+공통 순서:
+
+1. EXIF 방향 보정 (macOS: Core Image `oriented(forExifOrientation:)`)
+2. 목표 너비·높이 적용
+
+### 중심 크롭 (크롭 실행)
+
+1. cover scale 계산: `max(목표W/원본W, 목표H/원본H)` (한쪽이라도 작을 때만)
+2. 필요 시 비율 유지 확대
+3. 중심 기준으로 목표 크기만큼 크롭
+4. 출력 파일 접미사: `_cropped`
+
+### Stretch 리사이즈 (리사이즈 실행)
+
+1. 비율을 유지하지 않고 목표 너비·높이에 **맞춰 늘리거나 줄인다**
+2. 크롭하지 않는다
+3. 출력 파일 접미사: `_resized`
+
+## macOS 이미지 처리
+
+- **Core Graphics 좌표계 변환(Y축 뒤집기)으로 직접 그리지 않는다.**
+- Core Image(`CIImage`) 파이프라인을 사용해 EXIF 보정·확대·크롭을 처리한다.
+- 반전/좌표계 버그 재발 시 `CGContext` 수동 transform 대신 CIImage transform을 우선 검토한다.
+
+## UI 문구
+
+- 설명에는 **크롭**과 **리사이즈** 모두 가능함을 명시한다.
+- 실행 버튼: `크롭 실행`, `리사이즈 실행` (크롭 실행 옆에 배치)

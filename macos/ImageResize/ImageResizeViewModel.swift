@@ -103,8 +103,11 @@ final class ImageResizeViewModel: ObservableObject {
                 }
 
                 do {
-                    guard let cgImage = ImageProcessor.loadCGImage(from: items[index].sourceURL),
-                          let cropped = ImageProcessor.centerCrop(cgImage: cgImage, targetWidth: width, targetHeight: height) else {
+                    guard let cropped = ImageProcessor.centerCrop(
+                        from: items[index].sourceURL,
+                        targetWidth: width,
+                        targetHeight: height
+                    ) else {
                         throw ImageProcessorError.invalidImage
                     }
 

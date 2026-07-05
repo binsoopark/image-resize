@@ -1,12 +1,47 @@
 import AppKit
 import CoreGraphics
+import CoreImage
 import ImageIO
 import UniformTypeIdentifiers
 
 enum ImageProcessor {
+    private static let ciContext = CIContext(options: [.useSoftwareRenderer: false])
+
+    // MARK: - Load
+
+    static func loadCIImage(from url: URL) -> CIImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            return nil
+        }
+
+        var ciImage = CIImage(cgImage: cgImage)
+
+        if let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+           let orientationRaw = properties[kCGImagePropertyOrientation] as? UInt32,
+           orientationRaw != CGImagePropertyOrientation.up.rawValue {
+            ciImage = ciImage.oriented(forExifOrientation: Int32(orientationRaw))
+        }
+
+        // extent.origin 이 (0, 0) 이 아닐 수 있어 정규화
+        let origin = ciImage.extent.origin
+        if origin.x != 0 || origin.y != 0 {
+            ciImage = ciImage.transformed(by: CGAffineTransform(translationX: -origin.x, y: -origin.y))
+        }
+
+        return ciImage
+    }
+
     static func loadCGImage(from url: URL) -> CGImage? {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
-        return CGImageSourceCreateImageAtIndex(source, 0, nil)
+        guard let ciImage = loadCIImage(from: url) else { return nil }
+        let extent = ciImage.extent
+        return ciContext.createCGImage(ciImage, from: extent)
+    }
+
+    static func imageDimensions(at url: URL) -> (Int, Int)? {
+        guard let ciImage = loadCIImage(from: url) else { return nil }
+        let extent = ciImage.extent
+        return (Int(extent.width.rounded()), Int(extent.height.rounded()))
     }
 
     static func makePreview(from url: URL, maxSize: CGFloat = 480) -> NSImage? {
@@ -15,26 +50,38 @@ enum ImageProcessor {
         let height = CGFloat(cgImage.height)
         let scale = min(1, maxSize / max(width, height))
         let size = NSSize(width: width * scale, height: height * scale)
-        let image = NSImage(size: size)
-        image.lockFocus()
-        NSGraphicsContext.current?.imageInterpolation = .high
-        NSImage(cgImage: cgImage, size: NSSize(width: width, height: height))
-            .draw(in: NSRect(origin: .zero, size: size), from: .zero, operation: .copy, fraction: 1)
-        image.unlockFocus()
+        let image = NSImage(cgImage: cgImage, size: size)
         return image
     }
 
-    static func imageDimensions(at url: URL) -> (Int, Int)? {
-        guard let cgImage = loadCGImage(from: url) else { return nil }
-        return (cgImage.width, cgImage.height)
+    // MARK: - Center crop
+
+    /// 1) EXIF 방향 보정된 이미지 기준으로 크기 계산
+    /// 2) 목표보다 작으면 cover 방식으로 확대
+    /// 3) 중심 기준으로 목표 크기만큼 크롭
+    static func centerCrop(cgImage: CGImage, targetWidth: Int, targetHeight: Int) -> CGImage? {
+        centerCrop(ciImage: CIImage(cgImage: cgImage), targetWidth: targetWidth, targetHeight: targetHeight)
     }
 
-    static func centerCrop(cgImage: CGImage, targetWidth: Int, targetHeight: Int) -> CGImage? {
-        let srcW = CGFloat(cgImage.width)
-        let srcH = CGFloat(cgImage.height)
+    static func centerCrop(from url: URL, targetWidth: Int, targetHeight: Int) -> CGImage? {
+        guard let ciImage = loadCIImage(from: url) else { return nil }
+        return centerCrop(ciImage: ciImage, targetWidth: targetWidth, targetHeight: targetHeight)
+    }
+
+    private static func centerCrop(ciImage: CIImage, targetWidth: Int, targetHeight: Int) -> CGImage? {
         let targetW = CGFloat(targetWidth)
         let targetH = CGFloat(targetHeight)
 
+        var image = ciImage
+        let origin = image.extent.origin
+        if origin.x != 0 || origin.y != 0 {
+            image = image.transformed(by: CGAffineTransform(translationX: -origin.x, y: -origin.y))
+        }
+
+        let srcW = image.extent.width
+        let srcH = image.extent.height
+
+        // 1) cover scale 계산 (웹과 동일)
         var scale: CGFloat = 1
         if srcW < targetW || srcH < targetH {
             scale = max(targetW / srcW, targetH / srcH)
@@ -42,30 +89,25 @@ enum ImageProcessor {
 
         let scaledW = srcW * scale
         let scaledH = srcH * scale
+
+        // 2) 필요 시 확대
+        if scale != 1 {
+            image = image.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        }
+
+        // 3) 중심 크롭 (CIImage 좌표: 좌하단 원점)
         let cropX = (scaledW - targetW) / 2
         let cropY = (scaledH - targetH) / 2
+        let cropRect = CGRect(x: cropX, y: cropY, width: targetW, height: targetH)
 
-        let colorSpace = cgImage.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
-        guard let context = CGContext(
-            data: nil,
-            width: targetWidth,
-            height: targetHeight,
-            bitsPerComponent: 8,
-            bytesPerRow: 0,
-            space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { return nil }
+        image = image.cropped(to: cropRect)
+        image = image.transformed(by: CGAffineTransform(translationX: -cropX, y: -cropY))
 
-        context.interpolationQuality = .high
-        context.translateBy(x: 0, y: targetH)
-        context.scaleBy(x: 1, y: -1)
-        context.draw(
-            cgImage,
-            in: CGRect(x: -cropX, y: -cropY, width: scaledW, height: scaledH)
-        )
-
-        return context.makeImage()
+        let outputRect = CGRect(x: 0, y: 0, width: targetW, height: targetH)
+        return ciContext.createCGImage(image, from: outputRect)
     }
+
+    // MARK: - Write
 
     static func write(cgImage: CGImage, to url: URL, format: OutputFormat, jpegQuality: CGFloat = 0.92) throws {
         guard let destination = CGImageDestinationCreateWithURL(url as CFURL, format.utType.identifier as CFString, 1, nil) else {
