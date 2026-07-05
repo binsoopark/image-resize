@@ -79,7 +79,7 @@ final class ImageResizeViewModel: ObservableObject {
         outputDirectory = nil
     }
 
-    func processAll() {
+    func processAll(mode: ProcessingMode) {
         guard targetWidth >= 1, targetHeight >= 1 else {
             presentAlert("너비와 높이는 1 이상이어야 합니다.")
             return
@@ -90,6 +90,7 @@ final class ImageResizeViewModel: ObservableObject {
         let width = targetWidth
         let height = targetHeight
         let format = outputFormat
+        let suffix = mode.fileSuffix
 
         Task {
             let tempDir = makeTempOutputDirectory()
@@ -97,26 +98,44 @@ final class ImageResizeViewModel: ObservableObject {
 
             for index in items.indices {
                 items[index].status = .processing
+                items[index].outputSuffix = nil
                 if let oldURL = items[index].processedURL {
                     try? FileManager.default.removeItem(at: oldURL)
                     items[index].processedURL = nil
                 }
 
                 do {
-                    guard let cropped = ImageProcessor.centerCrop(
-                        from: items[index].sourceURL,
-                        targetWidth: width,
-                        targetHeight: height
-                    ) else {
+                    let processed: CGImage?
+                    switch mode {
+                    case .centerCrop:
+                        processed = ImageProcessor.centerCrop(
+                            from: items[index].sourceURL,
+                            targetWidth: width,
+                            targetHeight: height
+                        )
+                    case .stretch:
+                        processed = ImageProcessor.stretchResize(
+                            from: items[index].sourceURL,
+                            targetWidth: width,
+                            targetHeight: height
+                        )
+                    }
+
+                    guard let processed else {
                         throw ImageProcessorError.invalidImage
                     }
 
-                    let fileName = ImageProcessor.outputFileName(for: items[index].sourceURL, format: format)
+                    let fileName = ImageProcessor.outputFileName(
+                        for: items[index].sourceURL,
+                        format: format,
+                        suffix: suffix
+                    )
                     let destination = tempDir.appendingPathComponent(fileName)
-                    try ImageProcessor.write(cgImage: cropped, to: destination, format: format)
+                    try ImageProcessor.write(cgImage: processed, to: destination, format: format)
 
                     items[index].processedURL = destination
                     items[index].previewImage = NSImage(contentsOf: destination)
+                    items[index].outputSuffix = suffix
                     items[index].status = .done
                 } catch {
                     items[index].status = .error(error.localizedDescription)

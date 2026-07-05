@@ -107,6 +107,29 @@ enum ImageProcessor {
         return ciContext.createCGImage(image, from: outputRect)
     }
 
+    // MARK: - Stretch resize
+
+    /// 1) EXIF 방향 보정
+    /// 2) 비율 무시하고 목표 너비·높이에 맞춰 늘리거나 줄임
+    static func stretchResize(from url: URL, targetWidth: Int, targetHeight: Int) -> CGImage? {
+        guard var image = loadCIImage(from: url) else { return nil }
+
+        let origin = image.extent.origin
+        if origin.x != 0 || origin.y != 0 {
+            image = image.transformed(by: CGAffineTransform(translationX: -origin.x, y: -origin.y))
+        }
+
+        let srcW = image.extent.width
+        let srcH = image.extent.height
+        let scaleX = CGFloat(targetWidth) / srcW
+        let scaleY = CGFloat(targetHeight) / srcH
+
+        image = image.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
+
+        let outputRect = CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight)
+        return ciContext.createCGImage(image, from: outputRect)
+    }
+
     // MARK: - Write
 
     static func write(cgImage: CGImage, to url: URL, format: OutputFormat, jpegQuality: CGFloat = 0.92) throws {
@@ -128,9 +151,9 @@ enum ImageProcessor {
         }
     }
 
-    static func outputFileName(for sourceURL: URL, format: OutputFormat) -> String {
+    static func outputFileName(for sourceURL: URL, format: OutputFormat, suffix: String = "cropped") -> String {
         let base = sourceURL.deletingPathExtension().lastPathComponent
-        return "\(base)_cropped.\(format.fileExtension)"
+        return "\(base)_\(suffix).\(format.fileExtension)"
     }
 }
 

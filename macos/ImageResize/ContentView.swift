@@ -27,7 +27,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Image Resize")
                 .font(.largeTitle.bold())
-            Text("여러 이미지를 드래그하거나 추가한 뒤, 원하는 크기로 중심 기준 크롭합니다. 이미지가 목표보다 작으면 먼저 확대한 다음 크롭합니다.")
+            Text("여러 이미지를 드래그하거나 추가한 뒤, 원하는 크기로 중심 기준 크롭하거나 비율과 관계없이 늘리거나 줄여 리사이즈할 수 있습니다. 크롭 시 이미지가 목표보다 작으면 먼저 확대한 다음 잘라냅니다.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -61,7 +61,10 @@ struct ContentView: View {
             Spacer()
 
             Button("이미지 추가") { viewModel.addImagesViaPanel() }
-            Button("크롭 실행") { viewModel.processAll() }
+            Button("크롭 실행") { viewModel.processAll(mode: .centerCrop) }
+                .buttonStyle(.borderedProminent)
+                .disabled(viewModel.items.isEmpty || viewModel.isProcessing)
+            Button("리사이즈 실행") { viewModel.processAll(mode: .stretch) }
                 .buttonStyle(.borderedProminent)
                 .disabled(viewModel.items.isEmpty || viewModel.isProcessing)
             Button("전체 저장") { viewModel.saveAll() }

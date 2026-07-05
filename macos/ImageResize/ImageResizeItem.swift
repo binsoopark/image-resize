@@ -55,6 +55,18 @@ enum OutputFormat: String, CaseIterable, Identifiable {
     }
 }
 
+enum ProcessingMode {
+    case centerCrop
+    case stretch
+
+    var fileSuffix: String {
+        switch self {
+        case .centerCrop: return "cropped"
+        case .stretch: return "resized"
+        }
+    }
+}
+
 struct ImageResizeItem: Identifiable {
     let id = UUID()
     let sourceURL: URL
@@ -64,6 +76,7 @@ struct ImageResizeItem: Identifiable {
     var status: ProcessingStatus = .ready
     var processedURL: URL?
     var previewImage: NSImage?
+    var outputSuffix: String?
 
     init(sourceURL: URL, originalWidth: Int, originalHeight: Int, previewImage: NSImage?) {
         self.sourceURL = sourceURL

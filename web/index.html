@@ -11,8 +11,9 @@
       <header class="header">
         <h1>Image Resize</h1>
         <p class="subtitle">
-          여러 이미지를 드래그하거나 선택한 뒤, 원하는 크기로 중심 기준 크롭합니다.
-          이미지가 목표보다 작으면 먼저 확대한 다음 크롭합니다.
+          여러 이미지를 드래그하거나 선택한 뒤, 원하는 크기로 중심 기준 크롭하거나
+          비율과 관계없이 늘리거나 줄여 리사이즈할 수 있습니다.
+          크롭 시 이미지가 목표보다 작으면 먼저 확대한 다음 잘라냅니다.
         </p>
       </header>
 
@@ -39,6 +40,9 @@
         <div class="actions">
           <button type="button" id="processBtn" class="btn primary" disabled>
             크롭 실행
+          </button>
+          <button type="button" id="resizeBtn" class="btn primary" disabled>
+            리사이즈 실행
           </button>
           <button type="button" id="downloadAllBtn" class="btn" disabled>
             전체 다운로드

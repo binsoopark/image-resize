@@ -1,4 +1,4 @@
-/** @typedef {{ id: string, file: File, objectUrl: string, originalWidth: number, originalHeight: number, resultBlob: Blob | null, resultUrl: string | null, status: 'ready' | 'processing' | 'done' | 'error', error: string | null }} ImageItem */
+/** @typedef {{ id: string, file: File, objectUrl: string, originalWidth: number, originalHeight: number, resultBlob: Blob | null, resultUrl: string | null, outputSuffix: string | null, status: 'ready' | 'processing' | 'done' | 'error', error: string | null }} ImageItem */
 
 const dropZone = document.getElementById("dropZone");
 const fileInput = document.getElementById("fileInput");
@@ -6,6 +6,7 @@ const targetWidthInput = document.getElementById("targetWidth");
 const targetHeightInput = document.getElementById("targetHeight");
 const outputFormatSelect = document.getElementById("outputFormat");
 const processBtn = document.getElementById("processBtn");
+const resizeBtn = document.getElementById("resizeBtn");
 const downloadAllBtn = document.getElementById("downloadAllBtn");
 const clearBtn = document.getElementById("clearBtn");
 const gallery = document.getElementById("gallery");
@@ -32,6 +33,7 @@ function updateButtons() {
   const hasItems = items.length > 0;
   const hasResults = items.some((item) => item.status === "done" && item.resultBlob);
   processBtn.disabled = !hasItems;
+  resizeBtn.disabled = !hasItems;
   clearBtn.disabled = !hasItems;
   downloadAllBtn.disabled = !hasResults;
 }
@@ -56,9 +58,9 @@ function getExtension(mime) {
   return "png";
 }
 
-function outputFileName(originalName, mime) {
+function outputFileName(originalName, mime, suffix = "cropped") {
   const base = originalName.replace(/\.[^.]+$/, "");
-  return `${base}_cropped.${getExtension(mime)}`;
+  return `${base}_${suffix}.${getExtension(mime)}`;
 }
 
 function centerCropImage(img, targetW, targetH, mime, quality = 0.92) {
@@ -84,6 +86,29 @@ function centerCropImage(img, targetW, targetH, mime, quality = 0.92) {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(img, 0, 0, srcW, srcH, -cropX, -cropY, scaledW, scaledH);
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("이미지 변환에 실패했습니다."));
+      },
+      mime,
+      quality,
+    );
+  });
+}
+
+function stretchResizeImage(img, targetW, targetH, mime, quality = 0.92) {
+  const canvas = document.createElement("canvas");
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas를 사용할 수 없습니다.");
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, 0, 0, targetW, targetH);
 
   return new Promise((resolve, reject) => {
     canvas.toBlob(
@@ -188,6 +213,7 @@ async function addFiles(fileList) {
         originalHeight: img.naturalHeight,
         resultBlob: null,
         resultUrl: null,
+        outputSuffix: null,
         status: "ready",
         error: null,
       });
@@ -209,7 +235,7 @@ function readTargetSize() {
   return { w, h };
 }
 
-async function processAll() {
+async function processImages(mode) {
   let target;
   try {
     target = readTargetSize();
@@ -220,12 +246,16 @@ async function processAll() {
 
   const mime = outputFormatSelect.value;
   const quality = mime === "image/png" ? undefined : 0.92;
+  const suffix = mode === "crop" ? "cropped" : "resized";
+  const processImage = mode === "crop" ? centerCropImage : stretchResizeImage;
 
   processBtn.disabled = true;
+  resizeBtn.disabled = true;
 
   for (const item of items) {
     item.status = "processing";
     item.error = null;
+    item.outputSuffix = null;
     if (item.resultUrl) {
       URL.revokeObjectURL(item.resultUrl);
       item.resultUrl = null;
@@ -235,9 +265,10 @@ async function processAll() {
 
     try {
       const img = await loadImageFromUrl(item.objectUrl);
-      const blob = await centerCropImage(img, target.w, target.h, mime, quality);
+      const blob = await processImage(img, target.w, target.h, mime, quality);
       item.resultBlob = blob;
       item.resultUrl = URL.createObjectURL(blob);
+      item.outputSuffix = suffix;
       item.status = "done";
     } catch (err) {
       item.status = "error";
@@ -248,7 +279,16 @@ async function processAll() {
   }
 
   processBtn.disabled = false;
+  resizeBtn.disabled = false;
   showToast("모든 이미지 처리가 완료되었습니다.");
+}
+
+async function processCropAll() {
+  await processImages("crop");
+}
+
+async function processStretchAll() {
+  await processImages("stretch");
 }
 
 function triggerDownload(blob, filename) {
@@ -262,7 +302,10 @@ function triggerDownload(blob, filename) {
 
 function downloadSingle(item) {
   if (!item.resultBlob) return;
-  triggerDownload(item.resultBlob, outputFileName(item.file.name, outputFormatSelect.value));
+  triggerDownload(
+    item.resultBlob,
+    outputFileName(item.file.name, outputFormatSelect.value, item.outputSuffix ?? "cropped"),
+  );
 }
 
 async function downloadAllWithDirectoryPicker(doneItems, mime) {
@@ -281,7 +324,7 @@ async function downloadAllWithDirectoryPicker(doneItems, mime) {
 
   for (const item of doneItems) {
     if (!item.resultBlob) continue;
-    const name = outputFileName(item.file.name, mime);
+    const name = outputFileName(item.file.name, mime, item.outputSuffix ?? "cropped");
     const fileHandle = await dirHandle.getFileHandle(name, { create: true });
     const writable = await fileHandle.createWritable();
     await writable.write(item.resultBlob);
@@ -305,11 +348,11 @@ async function downloadAllAsZip(doneItems, mime) {
   const zip = new JSZip();
   for (const item of doneItems) {
     if (!item.resultBlob) continue;
-    zip.file(outputFileName(item.file.name, mime), item.resultBlob);
+    zip.file(outputFileName(item.file.name, mime, item.outputSuffix ?? "cropped"), item.resultBlob);
   }
 
   const zipBlob = await zip.generateAsync({ type: "blob" });
-  triggerDownload(zipBlob, "cropped-images.zip");
+  triggerDownload(zipBlob, "processed-images.zip");
   showToast("ZIP 파일로 다운로드했습니다.");
 }
 
@@ -370,6 +413,7 @@ document.body.addEventListener("drop", (e) => {
   if (!dropZone.contains(e.target)) e.preventDefault();
 });
 
-processBtn.addEventListener("click", processAll);
+processBtn.addEventListener("click", processCropAll);
+resizeBtn.addEventListener("click", processStretchAll);
 downloadAllBtn.addEventListener("click", downloadAll);
 clearBtn.addEventListener("click", clearAll);
