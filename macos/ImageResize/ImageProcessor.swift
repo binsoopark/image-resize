@@ -147,20 +147,20 @@ enum ImageProcessor {
         return try opaqueRGB(from: composited, width: width, height: height)
     }
 
-    /// CIImage → 알파 채널 없는 RGB CGImage (NSGraphicsContext 사용하지 않음)
+    /// CIImage → 알파 채널 없는 RGB CGImage
     private static func opaqueRGB(from image: CIImage, width: Int, height: Int) throws -> CGImage {
         guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else {
             throw ImageProcessorError.transparencyRemovalFailed(reason: "색 공간을 만들 수 없습니다.")
         }
 
         let rect = CGRect(x: 0, y: 0, width: width, height: height)
-        let pixelCount = width * height
-        var rgba = [UInt8](repeating: 255, count: pixelCount * 4)
+        let srcRowBytes = width * 4
+        var rgba = [UInt8](repeating: 255, count: height * srcRowBytes)
 
         ciContext.render(
             image,
             toBitmap: &rgba,
-            rowBytes: width * 4,
+            rowBytes: srcRowBytes,
             bounds: rect,
             format: .RGBA8,
             colorSpace: colorSpace
@@ -178,16 +178,21 @@ enum ImageProcessor {
             throw ImageProcessorError.transparencyRemovalFailed(reason: "RGB 비트맵을 만들 수 없습니다.")
         }
 
-        let dst = pixelData.bindMemory(to: UInt8.self, capacity: pixelCount * 4)
+        let dstRowBytes = context.bytesPerRow
+        let dst = pixelData.bindMemory(to: UInt8.self, capacity: dstRowBytes * height)
+
         for y in 0..<height {
             // CIImage bitmap origin is bottom-left; CGImage is top-left
             let srcRow = height - 1 - y
+            let srcRowStart = srcRow * srcRowBytes
+            let dstRowStart = y * dstRowBytes
+
             for x in 0..<width {
-                let rgbaIndex = (srcRow * width + x) * 4
-                let dstIndex = (y * width + x) * 4
-                dst[dstIndex] = rgba[rgbaIndex]
-                dst[dstIndex + 1] = rgba[rgbaIndex + 1]
-                dst[dstIndex + 2] = rgba[rgbaIndex + 2]
+                let srcIndex = srcRowStart + x * 4
+                let dstIndex = dstRowStart + x * 4
+                dst[dstIndex] = rgba[srcIndex]
+                dst[dstIndex + 1] = rgba[srcIndex + 1]
+                dst[dstIndex + 2] = rgba[srcIndex + 2]
                 dst[dstIndex + 3] = 255
             }
         }
