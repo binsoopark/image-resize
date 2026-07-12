@@ -27,7 +27,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Image Resize")
                 .font(.largeTitle.bold())
-            Text("여러 이미지를 드래그하거나 추가한 뒤, 원하는 크기로 중심 기준 크롭하거나 비율과 관계없이 늘리거나 줄여 리사이즈할 수 있습니다. 크롭 시 이미지가 목표보다 작으면 먼저 확대한 다음 잘라냅니다.")
+            Text("여러 이미지를 드래그하거나 추가한 뒤, 원하는 크기로 중심 기준 크롭하거나 비율과 관계없이 늘리거나 줄여 리사이즈할 수 있습니다. 크롭 시 이미지가 목표보다 작으면 먼저 확대한 다음 잘라냅니다. 아이폰 앱 등록 등을 위해 투명도 제거 옵션도 제공합니다.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -57,6 +57,8 @@ struct ContentView: View {
                 .labelsHidden()
                 .frame(width: 100)
             }
+            Toggle("투명도 제거", isOn: $viewModel.removeTransparency)
+                .toggleStyle(.checkbox)
 
             Spacer()
 

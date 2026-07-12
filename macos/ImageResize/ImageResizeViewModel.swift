@@ -8,6 +8,7 @@ final class ImageResizeViewModel: ObservableObject {
     @Published var targetWidth: Int = 800
     @Published var targetHeight: Int = 600
     @Published var outputFormat: OutputFormat = .png
+    @Published var removeTransparency = false
     @Published var isProcessing = false
     @Published var showAlert = false
     @Published var alertMessage = ""
@@ -91,6 +92,7 @@ final class ImageResizeViewModel: ObservableObject {
         let height = targetHeight
         let format = outputFormat
         let suffix = mode.fileSuffix
+        let shouldRemoveTransparency = removeTransparency
 
         Task {
             let tempDir = makeTempOutputDirectory()
@@ -107,7 +109,7 @@ final class ImageResizeViewModel: ObservableObject {
                 }
 
                 do {
-                    let processed: CGImage?
+                    var processed: CGImage?
                     switch mode {
                     case .centerCrop:
                         processed = ImageProcessor.centerCrop(
@@ -123,8 +125,15 @@ final class ImageResizeViewModel: ObservableObject {
                         )
                     }
 
-                    guard let processed else {
+                    guard var processed else {
                         throw ImageProcessorError.invalidImage
+                    }
+
+                    if shouldRemoveTransparency {
+                        guard let flattened = ImageProcessor.removeTransparency(from: processed) else {
+                            throw ImageProcessorError.invalidImage
+                        }
+                        processed = flattened
                     }
 
                     let fileName = ImageProcessor.outputFileName(

@@ -130,6 +130,36 @@ enum ImageProcessor {
         return ciContext.createCGImage(image, from: outputRect)
     }
 
+    // MARK: - Transparency
+
+    /// 흰색 배경 위에 합성한 뒤 알파 채널 없는 RGB 이미지로 변환
+    static func removeTransparency(from cgImage: CGImage) -> CGImage? {
+        let width = cgImage.width
+        let height = cgImage.height
+        let rect = CGRect(x: 0, y: 0, width: width, height: height)
+
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(
+                data: nil,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+              ) else {
+            return nil
+        }
+
+        context.setFillColor(CGColor.white)
+        context.fill(rect)
+        context.interpolationQuality = .high
+        context.translateBy(x: 0, y: CGFloat(height))
+        context.scaleBy(x: 1, y: -1)
+        context.draw(cgImage, in: rect)
+        return context.makeImage()
+    }
+
     // MARK: - Write
 
     static func write(cgImage: CGImage, to url: URL, format: OutputFormat, jpegQuality: CGFloat = 0.92) throws {
