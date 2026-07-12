@@ -25,6 +25,11 @@ enum ProcessingStatus: Equatable {
         case .error: return .red
         }
     }
+
+    var errorMessage: String? {
+        if case let .error(message) = self { return message }
+        return nil
+    }
 }
 
 enum OutputFormat: String, CaseIterable, Identifiable {

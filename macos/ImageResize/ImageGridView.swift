@@ -68,6 +68,13 @@ struct ImageCardView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                if let errorMessage = item.status.errorMessage {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 HStack {
                     Button("저장") { viewModel.saveSingle(item) }
                         .disabled(item.processedURL == nil)

@@ -97,6 +97,7 @@ final class ImageResizeViewModel: ObservableObject {
         Task {
             let tempDir = makeTempOutputDirectory()
             outputDirectory = tempDir
+            var failureMessages: [String] = []
 
             for index in items.indices {
                 items[index].status = .processing
@@ -109,31 +110,15 @@ final class ImageResizeViewModel: ObservableObject {
                 }
 
                 do {
-                    var processed: CGImage?
-                    switch mode {
-                    case .centerCrop:
-                        processed = ImageProcessor.centerCrop(
-                            from: items[index].sourceURL,
-                            targetWidth: width,
-                            targetHeight: height
-                        )
-                    case .stretch:
-                        processed = ImageProcessor.stretchResize(
-                            from: items[index].sourceURL,
-                            targetWidth: width,
-                            targetHeight: height
-                        )
-                    }
-
-                    guard var processed else {
-                        throw ImageProcessorError.invalidImage
-                    }
+                    var processed = try processImage(
+                        from: items[index].sourceURL,
+                        mode: mode,
+                        width: width,
+                        height: height
+                    )
 
                     if shouldRemoveTransparency {
-                        guard let flattened = ImageProcessor.removeTransparency(from: processed) else {
-                            throw ImageProcessorError.invalidImage
-                        }
-                        processed = flattened
+                        processed = try ImageProcessor.removeTransparency(from: processed)
                     }
 
                     let fileName = ImageProcessor.outputFileName(
@@ -153,12 +138,29 @@ final class ImageResizeViewModel: ObservableObject {
                     items[index].outputHeight = height
                     items[index].status = .done
                 } catch {
-                    items[index].status = .error(error.localizedDescription)
+                    let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                    items[index].status = .error(message)
+                    failureMessages.append("\(items[index].fileName)\n\(message)")
                 }
             }
 
             isProcessing = false
-            presentAlert("모든 이미지 처리가 완료되었습니다.")
+            if failureMessages.isEmpty {
+                presentAlert("모든 이미지 처리가 완료되었습니다.")
+            } else {
+                let summary = failureMessages.prefix(3).joined(separator: "\n\n")
+                let extra = failureMessages.count > 3 ? "\n\n외 \(failureMessages.count - 3)개 파일" : ""
+                presentAlert("\(failureMessages.count)개 파일 처리 실패\n\n\(summary)\(extra)")
+            }
+        }
+    }
+
+    private func processImage(from url: URL, mode: ProcessingMode, width: Int, height: Int) throws -> CGImage {
+        switch mode {
+        case .centerCrop:
+            return try ImageProcessor.centerCrop(from: url, targetWidth: width, targetHeight: height)
+        case .stretch:
+            return try ImageProcessor.stretchResize(from: url, targetWidth: width, targetHeight: height)
         }
     }
 

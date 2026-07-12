@@ -162,6 +162,7 @@ function createCardElement(item) {
     <div class="card-body">
       <p class="file-name" title="${escapeHtml(item.file.name)}">${escapeHtml(item.file.name)}</p>
       <p class="meta">${item.originalWidth} × ${item.originalHeight}px</p>
+      ${item.error ? `<p class="error-message">${escapeHtml(item.error)}</p>` : ""}
       <div class="card-actions">
         <button type="button" class="btn download-one" ${item.resultBlob ? "" : "disabled"}>다운로드</button>
       </div>
@@ -273,6 +274,7 @@ async function processImages(mode) {
 
   processBtn.disabled = true;
   resizeBtn.disabled = true;
+  const failureMessages = [];
 
   for (const item of items) {
     item.status = "processing";
@@ -299,8 +301,10 @@ async function processImages(mode) {
       item.outputMime = resolveOutputMime(mime, removeTransparency);
       item.status = "done";
     } catch (err) {
+      const message = err instanceof Error ? err.message : "처리 실패";
       item.status = "error";
-      item.error = err instanceof Error ? err.message : "처리 실패";
+      item.error = message;
+      failureMessages.push(`${item.file.name}: ${message}`);
     }
 
     refreshCard(item);
@@ -308,7 +312,14 @@ async function processImages(mode) {
 
   processBtn.disabled = false;
   resizeBtn.disabled = false;
-  showToast("모든 이미지 처리가 완료되었습니다.");
+
+  if (failureMessages.length === 0) {
+    showToast("모든 이미지 처리가 완료되었습니다.");
+  } else {
+    const preview = failureMessages.slice(0, 2).join(" / ");
+    const extra = failureMessages.length > 2 ? ` 외 ${failureMessages.length - 2}개` : "";
+    showToast(`${failureMessages.length}개 파일 처리 실패: ${preview}${extra}`);
+  }
 }
 
 async function processCropAll() {

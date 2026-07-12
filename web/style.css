@@ -302,6 +302,14 @@ body {
   color: var(--text-muted);
 }
 
+.error-message {
+  margin: 0 0 0.75rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--danger);
+  word-break: break-word;
+}
+
 .card-actions {
   display: flex;
   gap: 0.5rem;
