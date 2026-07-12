@@ -171,23 +171,24 @@ enum ImageProcessor {
             width: width,
             height: height,
             bitsPerComponent: 8,
-            bytesPerRow: width * 3,
+            bytesPerRow: 0,
             space: colorSpace,
             bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
-        ), let rgbData = context.data else {
+        ), let pixelData = context.data else {
             throw ImageProcessorError.transparencyRemovalFailed(reason: "RGB 비트맵을 만들 수 없습니다.")
         }
 
-        let rgb = rgbData.bindMemory(to: UInt8.self, capacity: pixelCount * 3)
+        let dst = pixelData.bindMemory(to: UInt8.self, capacity: pixelCount * 4)
         for y in 0..<height {
             // CIImage bitmap origin is bottom-left; CGImage is top-left
             let srcRow = height - 1 - y
             for x in 0..<width {
                 let rgbaIndex = (srcRow * width + x) * 4
-                let rgbIndex = (y * width + x) * 3
-                rgb[rgbIndex] = rgba[rgbaIndex]
-                rgb[rgbIndex + 1] = rgba[rgbaIndex + 1]
-                rgb[rgbIndex + 2] = rgba[rgbaIndex + 2]
+                let dstIndex = (y * width + x) * 4
+                dst[dstIndex] = rgba[rgbaIndex]
+                dst[dstIndex + 1] = rgba[rgbaIndex + 1]
+                dst[dstIndex + 2] = rgba[rgbaIndex + 2]
+                dst[dstIndex + 3] = 255
             }
         }
 
