@@ -149,6 +149,13 @@ function loadImageFromUrl(url) {
   });
 }
 
+function formatDimensions(item) {
+  if (item.status === "done" && item.outputWidth && item.outputHeight) {
+    return `출력 ${item.outputWidth} × ${item.outputHeight}px · 원본 ${item.originalWidth} × ${item.originalHeight}px`;
+  }
+  return `원본 ${item.originalWidth} × ${item.originalHeight}px`;
+}
+
 function createCardElement(item) {
   const card = document.createElement("article");
   card.className = `image-card ${item.status}`;
@@ -161,7 +168,7 @@ function createCardElement(item) {
     </div>
     <div class="card-body">
       <p class="file-name" title="${escapeHtml(item.file.name)}">${escapeHtml(item.file.name)}</p>
-      <p class="meta">${item.originalWidth} × ${item.originalHeight}px</p>
+      <p class="meta">${formatDimensions(item)}</p>
       ${item.error ? `<p class="error-message">${escapeHtml(item.error)}</p>` : ""}
       <div class="card-actions">
         <button type="button" class="btn download-one" ${item.resultBlob ? "" : "disabled"}>다운로드</button>

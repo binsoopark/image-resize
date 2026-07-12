@@ -110,16 +110,13 @@ final class ImageResizeViewModel: ObservableObject {
                 }
 
                 do {
-                    var processed = try processImage(
+                    let processed = try ImageProcessor.process(
                         from: items[index].sourceURL,
                         mode: mode,
-                        width: width,
-                        height: height
+                        targetWidth: width,
+                        targetHeight: height,
+                        removeTransparency: shouldRemoveTransparency
                     )
-
-                    if shouldRemoveTransparency {
-                        processed = try ImageProcessor.removeTransparency(from: processed)
-                    }
 
                     let fileName = ImageProcessor.outputFileName(
                         for: items[index].sourceURL,
@@ -132,10 +129,13 @@ final class ImageResizeViewModel: ObservableObject {
                     try ImageProcessor.write(cgImage: processed, to: destination, format: format)
 
                     items[index].processedURL = destination
-                    items[index].previewImage = NSImage(contentsOf: destination)
                     items[index].outputSuffix = suffix
-                    items[index].outputWidth = width
-                    items[index].outputHeight = height
+                    items[index].outputWidth = processed.width
+                    items[index].outputHeight = processed.height
+                    items[index].previewImage = NSImage(
+                        cgImage: processed,
+                        size: NSSize(width: processed.width, height: processed.height)
+                    )
                     items[index].status = .done
                 } catch {
                     let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -152,15 +152,6 @@ final class ImageResizeViewModel: ObservableObject {
                 let extra = failureMessages.count > 3 ? "\n\n외 \(failureMessages.count - 3)개 파일" : ""
                 presentAlert("\(failureMessages.count)개 파일 처리 실패\n\n\(summary)\(extra)")
             }
-        }
-    }
-
-    private func processImage(from url: URL, mode: ProcessingMode, width: Int, height: Int) throws -> CGImage {
-        switch mode {
-        case .centerCrop:
-            return try ImageProcessor.centerCrop(from: url, targetWidth: width, targetHeight: height)
-        case .stretch:
-            return try ImageProcessor.stretchResize(from: url, targetWidth: width, targetHeight: height)
         }
     }
 

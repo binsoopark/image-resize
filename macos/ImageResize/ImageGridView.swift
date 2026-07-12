@@ -64,9 +64,18 @@ struct ImageCardView: View {
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Text("\(item.originalWidth) × \(item.originalHeight) px")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if item.outputWidth != nil, item.outputHeight != nil {
+                    Text("원본 \(item.originalWidth) × \(item.originalHeight) px")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("→ \(item.outputWidth!) × \(item.outputHeight!) px")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.primary)
+                } else {
+                    Text("원본 \(item.originalWidth) × \(item.originalHeight) px")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 if let errorMessage = item.status.errorMessage {
                     Text(errorMessage)

@@ -40,10 +40,20 @@ alwaysApply: true
 
 ## macOS 이미지 처리
 
-- **Core Graphics 좌표계 변환(Y축 뒤집기)으로 직접 그리지 않는다.**
-- Core Image(`CIImage`) 파이프라인을 사용해 EXIF 보정·확대·크롭·투명도 제거를 처리한다.
-- 투명도 제거는 `CIImage` 흰 배경 합성 → `render(toBitmap:)` → RGB `CGContext` 순서로 처리한다. `NSGraphicsContext(bitmapImageRep:)`는 알파 없는 3채널 비트맵에서 실패할 수 있으므로 사용하지 않는다.
-- 반전/좌표계 버그 재발 시 `CGContext` 수동 transform 대신 CIImage transform을 우선 검토한다.
+모든 변환은 **CIImage 단일 파이프라인**으로 처리한다. 단계를 섞거나 CGImage ↔ CIImage 왕복을 하지 않는다.
+
+1. **Load** — 파일 → CIImage (EXIF 보정, origin 정규화)
+2. **Transform** — 크롭 또는 stretch (CIImage transform)
+3. **Flatten** — (선택) 흰 배경 합성 (`flattenOnWhite`, 웹 `prepareCanvas`와 동일)
+4. **Export** — `createCGImage` **단일 출구** → (선택) vImage로 RGB 변환
+
+금지 사항:
+
+- `CGContext` Y축 뒤집기·수동 픽셀 복사로 좌표계를 맞추지 않는다.
+- 크롭/리사이즈 후 `CGImage` → `CIImage`로 되돌려 투명도를 제거하지 않는다.
+- `NSGraphicsContext(bitmapImageRep:)` + 알파 없는 3채널 비트맵 조합은 사용하지 않는다.
+
+투명도 제거는 반드시 **Transform 이후 CIImage 단계**에서 흰 배경 합성하고, Export에서 vImage `stripAlphaChannel`만 사용한다.
 
 ## UI 문구
 
