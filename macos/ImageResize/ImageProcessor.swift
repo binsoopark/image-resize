@@ -138,26 +138,43 @@ enum ImageProcessor {
         let height = cgImage.height
         let rect = CGRect(x: 0, y: 0, width: width, height: height)
 
-        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
-              let context = CGContext(
-                data: nil,
-                width: width,
-                height: height,
-                bitsPerComponent: 8,
-                bytesPerRow: 0,
-                space: colorSpace,
-                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
-              ) else {
-            return nil
-        }
+        let background = CIImage(color: CIColor.white).cropped(to: rect)
+        let foreground = CIImage(cgImage: cgImage)
+        let composited = foreground.composited(over: background)
 
-        context.setFillColor(CGColor.white)
-        context.fill(rect)
-        context.interpolationQuality = .high
-        context.translateBy(x: 0, y: CGFloat(height))
-        context.scaleBy(x: 1, y: -1)
-        context.draw(cgImage, in: rect)
-        return context.makeImage()
+        guard let flattened = ciContext.createCGImage(composited, from: rect) else { return nil }
+        return copyAsOpaqueRGB(flattened)
+    }
+
+    /// CIImage 렌더 결과를 알파 없는 RGB 비트맵으로 복사 (좌표계 수동 변환 없음)
+    private static func copyAsOpaqueRGB(_ image: CGImage) -> CGImage? {
+        let width = image.width
+        let height = image.height
+        let size = NSSize(width: width, height: height)
+
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: width,
+            pixelsHigh: height,
+            bitsPerSample: 8,
+            samplesPerPixel: 3,
+            hasAlpha: false,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ) else { return nil }
+
+        rep.size = size
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+
+        guard let graphicsContext = NSGraphicsContext(bitmapImageRep: rep) else { return nil }
+        NSGraphicsContext.current = graphicsContext
+        graphicsContext.imageInterpolation = .high
+        NSImage(cgImage: image, size: size).draw(in: NSRect(origin: .zero, size: size))
+
+        return rep.cgImage
     }
 
     // MARK: - Write
