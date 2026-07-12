@@ -42,7 +42,7 @@ alwaysApply: true
 
 - **Core Graphics 좌표계 변환(Y축 뒤집기)으로 직접 그리지 않는다.**
 - Core Image(`CIImage`) 파이프라인을 사용해 EXIF 보정·확대·크롭·투명도 제거를 처리한다.
-- 투명도 제거는 `CIImage` 흰 배경 합성 → `createCGImage` → `NSBitmapImageRep`(RGB) 순서로 처리한다.
+- 투명도 제거는 `CIImage` 흰 배경 합성 → `render(toBitmap:)` → RGB `CGContext` 순서로 처리한다. `NSGraphicsContext(bitmapImageRep:)`는 알파 없는 3채널 비트맵에서 실패할 수 있으므로 사용하지 않는다.
 - 반전/좌표계 버그 재발 시 `CGContext` 수동 transform 대신 CIImage transform을 우선 검토한다.
 
 ## UI 문구

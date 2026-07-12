@@ -144,48 +144,58 @@ enum ImageProcessor {
         let foreground = CIImage(cgImage: cgImage)
         let composited = foreground.composited(over: background)
 
-        let flattened = try renderCIImage(composited, in: rect, step: "투명도 제거")
-        return try copyAsOpaqueRGB(flattened)
+        return try opaqueRGB(from: composited, width: width, height: height)
     }
 
-    private static func copyAsOpaqueRGB(_ image: CGImage) throws -> CGImage {
-        let width = image.width
-        let height = image.height
-        let size = NSSize(width: width, height: height)
+    /// CIImage → 알파 채널 없는 RGB CGImage (NSGraphicsContext 사용하지 않음)
+    private static func opaqueRGB(from image: CIImage, width: Int, height: Int) throws -> CGImage {
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else {
+            throw ImageProcessorError.transparencyRemovalFailed(reason: "색 공간을 만들 수 없습니다.")
+        }
 
-        guard let rep = NSBitmapImageRep(
-            bitmapDataPlanes: nil,
-            pixelsWide: width,
-            pixelsHigh: height,
-            bitsPerSample: 8,
-            samplesPerPixel: 3,
-            hasAlpha: false,
-            isPlanar: false,
-            colorSpaceName: .deviceRGB,
-            bytesPerRow: 0,
-            bitsPerPixel: 0
-        ) else {
+        let rect = CGRect(x: 0, y: 0, width: width, height: height)
+        let pixelCount = width * height
+        var rgba = [UInt8](repeating: 255, count: pixelCount * 4)
+
+        ciContext.render(
+            image,
+            toBitmap: &rgba,
+            rowBytes: width * 4,
+            bounds: rect,
+            format: .RGBA8,
+            colorSpace: colorSpace
+        )
+
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 3,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+        ), let rgbData = context.data else {
             throw ImageProcessorError.transparencyRemovalFailed(reason: "RGB 비트맵을 만들 수 없습니다.")
         }
 
-        rep.size = size
-        NSGraphicsContext.saveGraphicsState()
-        defer { NSGraphicsContext.restoreGraphicsState() }
-
-        guard let graphicsContext = NSGraphicsContext(bitmapImageRep: rep) else {
-            throw ImageProcessorError.transparencyRemovalFailed(reason: "그래픽 컨텍스트를 만들 수 없습니다.")
+        let rgb = rgbData.bindMemory(to: UInt8.self, capacity: pixelCount * 3)
+        for y in 0..<height {
+            // CIImage bitmap origin is bottom-left; CGImage is top-left
+            let srcRow = height - 1 - y
+            for x in 0..<width {
+                let rgbaIndex = (srcRow * width + x) * 4
+                let rgbIndex = (y * width + x) * 3
+                rgb[rgbIndex] = rgba[rgbaIndex]
+                rgb[rgbIndex + 1] = rgba[rgbaIndex + 1]
+                rgb[rgbIndex + 2] = rgba[rgbaIndex + 2]
+            }
         }
 
-        NSGraphicsContext.current = graphicsContext
-        graphicsContext.imageInterpolation = .high
-        NSImage(cgImage: image, size: size).draw(in: NSRect(origin: .zero, size: size))
-
-        var rect = NSRect(x: 0, y: 0, width: width, height: height)
-        guard let opaque = rep.cgImage(forProposedRect: &rect, context: nil, hints: nil) else {
+        guard let result = context.makeImage() else {
             throw ImageProcessorError.transparencyRemovalFailed(reason: "알파 없는 이미지로 변환하지 못했습니다.")
         }
 
-        return opaque
+        return result
     }
 
     // MARK: - Write
